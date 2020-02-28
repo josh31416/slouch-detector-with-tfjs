@@ -10,13 +10,13 @@ var posenetProperties = {
 	quantBytes: 1, // 1, 2, 4 (bytes per float) (the smaller the lower accuracy)
 }
 
-realTime = true;
+var realTime = false;
 
 const config = {
 	videoWidth: 600,
 	videoHeight: 500,
 	minPoseConfidence: 0.1,
-    minPartConfidence: 0.5,
+    minPartConfidence: 0.6,
 	// since images are being fed from a webcam, we want to feed in the
 	// original image and then just flip the keypoints' x coordinates. If instead
 	// we flip the image, then correcting left-right keypoint pairs requires a
@@ -47,8 +47,114 @@ async function run() {
 	canvas.width = config.videoWidth;
 	canvas.height = config.videoHeight;
 
-	poseDetectionFrame(video, net, canvas);
+	const model = createModel();
+	tfvis.show.modelSummary({name: 'Model Summary'}, model);
+
+	poseDetectionFrame(video, net, canvas, model);
 }
+
+/* BEGIN MLP */
+
+/**
+ * Predict if the user is slouching
+ *
+ * @param {array}	keypoints 	Array of keypoints predicted by posenet
+ */
+async function predictSlouching(keypoints, model) {
+	requiredKeypoints = [
+		'leftShoulder',
+		'leftEar',
+		'leftEye',
+		'nose',
+		'rightEye',
+		'rightEar',
+		'rightShoulder'
+	]
+
+	keypoints = keypoints
+		.filter(keypoint => (requiredKeypoints.includes(keypoint.part)))
+		.filter(keypoint => (keypoint.score > config.minPartConfidence));
+	if (keypoints.length != requiredKeypoints.length)
+		return; // not enough body points detected
+
+	const tensorData = convertToTensor(keypoints);
+	const { inputTensor } = tensorData;
+
+	// model.compile({
+	// 	optimizer: tf.train.adam(),
+	// 	loss: tf.losses.meanSquaredError,
+	// 	metrics: ['mse'],
+	// });
+	// Train the model  
+	// await trainModel(model, inputs, labels);
+	// console.log('Done Training');
+
+	const pred = model.predict(inputTensor);
+	console.log('---------------------------')
+	console.log(tf.sigmoid(pred).dataSync())
+}
+
+
+/**
+ * Extract position from all the keypoints
+ */
+function convertToTensor(keypoints, requiredKeypoints) {
+	keypoints = keypoints
+		.map(keypoint => ([
+			keypoint.position.x,
+			keypoint.position.y
+		]))
+		.flat();
+	const inputs = [keypoints];
+
+	const inputTensor = tf.tensor(inputs);
+
+	// const normalizedInputs = inputTensor
+	// 	.sub()
+	// 	.div([config.videoWidth, config.videoHeight].sub([0, 0]));
+
+	return { inputTensor }
+}
+
+
+/**
+ * Create MLP slouching classifier. Takes the keypoints of posenet as input.
+ */
+function createModel() {
+	const model = tf.sequential(); 
+
+	model.add(tf.layers.dense({inputDim: 14, units: 24, useBias: true}));
+	model.add(tf.layers.dense({units: 1, useBias: true}));
+
+	return model;
+}
+
+
+// async function trainModel(model, inputs, labels) {
+//   // Prepare the model for training.  
+//   model.compile({
+//     optimizer: tf.train.adam(),
+//     loss: tf.losses.meanSquaredError,
+//     metrics: ['mse'],
+//   });
+  
+//   const batchSize = 32;
+//   const epochs = 50;
+  
+//   return await model.fit(inputs, labels, {
+//     batchSize,
+//     epochs,
+//     shuffle: true,
+//     callbacks: tfvis.show.fitCallbacks(
+//       { name: 'Training Performance' },
+//       ['loss', 'mse'], 
+//       { height: 200, callbacks: ['onEpochEnd'] }
+//     )
+//   });
+// }
+
+
+/* END MLP */
 
 
 /**
@@ -254,7 +360,7 @@ function drawBoundingBox(keypoints, ctx) {
  * @param {Object}	net				Initialized detection model
  * @param {Object}	canvas			Canvas to draw the result of the detection
  */
-async function poseDetectionFrame(video, net, canvas) {
+async function poseDetectionFrame(video, net, canvas, model) {
 	/*
 	 * Change to architecture
 	 */
@@ -346,13 +452,12 @@ async function poseDetectionFrame(video, net, canvas) {
 		}
 	});
 
-	console.log(poses)
+	await predictSlouching(poses[0].keypoints, model)
 
-	// calculateSlouchness(poses[0].keypoints)
 	if (realTime)
-		requestAnimationFrame(poseDetectionFrame.bind(null, video, net, canvas))
+		requestAnimationFrame(poseDetectionFrame.bind(null, video, net, canvas, model))
 	else
-		setTimeout(poseDetectionFrame.bind(null, video, net, canvas), 1000);
+		setTimeout(poseDetectionFrame.bind(null, video, net, canvas, model), 1000);
 }
 
 
