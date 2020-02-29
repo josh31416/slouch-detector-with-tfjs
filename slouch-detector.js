@@ -10,8 +10,6 @@ var posenetProperties = {
 	quantBytes: 1, // 1, 2, 4 (bytes per float) (the smaller the lower accuracy)
 }
 
-var realTime = false;
-
 const config = {
 	videoWidth: 600,
 	videoHeight: 500,
@@ -24,8 +22,21 @@ const config = {
 	flipPoseHorizontal: false,
 	color: 'aqua',
 	boundingBoxColor: 'red',
-	lineWidth: 2
+	lineWidth: 2,
+	mlpThreshold: 0.5
 }
+
+
+var realTime = true;
+var requiredKeypoints = [
+		'leftShoulder',
+		// 'leftEar',
+		'leftEye',
+		'nose',
+		'rightEye',
+		// 'rightEar',
+		'rightShoulder'
+	]
 
 
 /*
@@ -48,7 +59,7 @@ async function run() {
 	canvas.height = config.videoHeight;
 
 	const model = createModel();
-	tfvis.show.modelSummary({name: 'Model Summary'}, model);
+	// tfvis.show.modelSummary({name: 'Model Summary'}, model);
 
 	poseDetectionFrame(video, net, canvas, model);
 }
@@ -61,44 +72,50 @@ async function run() {
  * @param {array}	keypoints 	Array of keypoints predicted by posenet
  */
 async function predictSlouching(keypoints, model) {
-	requiredKeypoints = [
-		'leftShoulder',
-		'leftEar',
-		'leftEye',
-		'nose',
-		'rightEye',
-		'rightEar',
-		'rightShoulder'
-	]
 
 	keypoints = keypoints
 		.filter(keypoint => (requiredKeypoints.includes(keypoint.part)))
 		.filter(keypoint => (keypoint.score > config.minPartConfidence));
-	if (keypoints.length != requiredKeypoints.length)
-		return; // not enough body points detected
+
+	var $alert = $('.alert');
+	if (keypoints.length != requiredKeypoints.length) { // not enough body points detected
+		var visibleParts = keypoints.map(keypoint => (keypoint.part));
+		var part = requiredKeypoints.filter(requiredKeypoint => (visibleParts.indexOf(requiredKeypoint) === -1))[0];
+		$alert.prop('class', 'alert alert-secondary');
+		$alert.find('.alert-heading').html('Well, this is embarrassing but...')
+		$alert.find('.alert-text').html(`It looks like I can't see your ${part}`);
+		return;
+	}
 
 	const tensorData = convertToTensor(keypoints);
 	const { inputTensor } = tensorData;
 
-	// model.compile({
-	// 	optimizer: tf.train.adam(),
-	// 	loss: tf.losses.meanSquaredError,
-	// 	metrics: ['mse'],
-	// });
-	// Train the model  
+	// Train the model
 	// await trainModel(model, inputs, labels);
 	// console.log('Done Training');
 
 	const pred = model.predict(inputTensor);
-	console.log('---------------------------')
-	console.log(tf.sigmoid(pred).dataSync())
+	const output = tf.sigmoid(pred).dataSync();
+	if (output >= config.mlpThreshold) {
+		$('.slouching-alert').addClass('active');
+		$alert.prop('class', 'alert alert-warning');
+		$alert.find('.alert-heading').html("Don't give up now")
+		$alert.find('.alert-text').html('You can do it!');
+	} else {
+		$('.slouching-alert').removeClass('active');
+		$alert.prop('class', 'alert');
+		$alert.find('.alert-heading').html('You are doing great')
+		$alert.find('.alert-text').html('Keep it up!');
+	}
+
+	console.log(output)
 }
 
 
 /**
  * Extract position from all the keypoints
  */
-function convertToTensor(keypoints, requiredKeypoints) {
+function convertToTensor(keypoints) {
 	keypoints = keypoints
 		.map(keypoint => ([
 			keypoint.position.x,
@@ -123,7 +140,9 @@ function convertToTensor(keypoints, requiredKeypoints) {
 function createModel() {
 	const model = tf.sequential(); 
 
-	model.add(tf.layers.dense({inputDim: 14, units: 24, useBias: true}));
+	inputDim = requiredKeypoints.length * 2;
+
+	model.add(tf.layers.dense({inputDim: inputDim, units: 24, useBias: true}));
 	model.add(tf.layers.dense({units: 1, useBias: true}));
 
 	return model;
@@ -247,10 +266,11 @@ async function loadVideo() {
 	try {
 		video = await setupCamera();
 	} catch (e) {
-		let info = document.getElementById('info');
-		info.textContent = 'This browser does not support video capture,' +
-			'or this device does not have a camera';
-		info.style.display = 'block';
+		var $alert = $('.alert');
+		$alert.prop('class', 'alert alert-danger');
+		$alert.find('.alert-heading').html('Video not supported')
+		$alert.find('.alert-text').html('This browser does not support video capture,' +
+			'or this device does not have a camera');
 		throw e;
 	}
 	video.play();

@@ -9,24 +9,49 @@
 </head>
 
 <body>
-    <div id="info" style='display:none'>
-    </div>
-    <div id="loading" style='display:flex'>
+    <div id="loading" style='display:flex;'>
         <div class="spinner-text">
             Loading PoseNet model...
         </div>
         <div class="sk-spinner sk-spinner-pulse"></div>
     </div>
-    <div id="main" class="d-flex justify-content-center" style='display:none'>
-        <video id="video" playsinline style="display: none;">
-        </video>
-        <canvas id="output" />
+    <div id="main" class="container" style='display:none;'>
+        <div class="row align-items-center" style="height:100vh;">
+            <div class="col-6 d-flex justify-content-end">
+                <div class="rounded-left">
+                    <video id="video" playsinline style="display: none;">
+                    </video>
+                    <canvas id="output"></canvas>
+                </div>
+            </div>
+            <div class="col-6">
+                <h3 class="mb-5">
+                    Slouch detector
+                    <small class="text-muted">Keeping you on the straight (and narrow)</small>
+                </h3>
+                <div class="d-flex justify-content-center my-5">
+                    <i class="fas fa-bell slouching-alert"></i>
+                </div>
+                <div class="my-5">
+                    <div class="alert" role="alert">
+                        <h4 class="alert-heading"></h4>
+                        <span class="alert-text"></span>
+                    </div>
+                </div>
+                <hr>
+                <div class="mt-5">
+                    <p>Not working as expected? Maybe I need some help.</p>
+                    <button type="button" class="btn btn-dark btn-block">Train me!</button>
+                </div>
+            </div>
+        </div>
     </div>
     <div><h1 style="float:right;" id="distance"></h1></div>
 
     <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+    <script src="https://use.fontawesome.com/releases/v5.11.0/js/all.js" crossorigin="anonymous"></script>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
