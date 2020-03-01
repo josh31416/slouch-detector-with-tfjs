@@ -9,39 +9,54 @@
 </head>
 
 <body>
-    <div id="loading" style='display:flex;'>
-        <div class="spinner-text">
-            Loading PoseNet model...
-        </div>
-        <div class="sk-spinner sk-spinner-pulse"></div>
-    </div>
-    <div id="main" class="container" style='display:none;'>
+    <div class="container">
         <div class="row align-items-center" style="height:100vh;">
             <div class="col-6 d-flex justify-content-end">
-                <div class="rounded-left">
-                    <video id="video" playsinline style="display: none;">
+                <div id="main">
+                    <video id="video" playsinline style="display:none;">
                     </video>
                     <canvas id="output"></canvas>
                 </div>
+                <div id="loading" class="col-6 d-flex justify-content-start">
+                    <div class="sk-spinner sk-spinner-pulse"></div>
+                </div>
             </div>
             <div class="col-6">
-                <h3 class="mb-5">
+                <h3 class="mb-4">
                     Slouch detector
-                    <small class="text-muted">Keeping you on the straight (and narrow)</small>
+                    <small class="text-muted">Keeping you straighter than a drill sergeant</small>
                 </h3>
-                <div class="d-flex justify-content-center my-5">
-                    <i class="fas fa-bell slouching-alert"></i>
-                </div>
-                <div class="my-5">
-                    <div class="alert" role="alert">
-                        <h4 class="alert-heading"></h4>
-                        <span class="alert-text"></span>
+                <div class="prediction mt-1">
+                    <div class="d-flex justify-content-center my-5">
+                        <i class="fas fa-exclamation-triangle slouching-alert"></i>
+                    </div>
+                    <div class="my-5">
+                        <div class="alert" role="alert">
+                            <h4 class="alert-heading"></h4>
+                            <span class="alert-text"></span>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="mt-5">
+                        <p>Not working as expected? Maybe I need some help.</p>
+                        <button type="button" class="btn btn-lg btn-dark btn-block training-button">Train me!</button>
                     </div>
                 </div>
-                <hr>
-                <div class="mt-5">
-                    <p>Not working as expected? Maybe I need some help.</p>
-                    <button type="button" class="btn btn-dark btn-block">Train me!</button>
+                <div class="training" style="display:none;">
+                    <p>The training will consist of two parts:</p>
+                    <ol>
+                        <li class="slouching-part">Gather examples of you slouching. <span class="text-muted">This way I can learn what slouching actually is</span></li>
+                        <li class="straight-part">Gather examples of you sitting straight. <span class="text-muted">This way I can learn what slouching is not</span></li>
+                    </ol>
+                    <hr>
+                    <p class="training-info"></p>
+                    <div class="training-actions">
+                        <button type="button" class="btn btn-lg btn-primary training-start-button">Start</button>
+                        <button type="button" class="btn btn-lg btn-secondary training-cancel-button">Cancel</button>
+                    </div>
+                    <div class="progress" style="display:none;">
+                        <div class="progress-bar" role="progressbar" style="width: 25%;">25%</div>
+                    </div>
                 </div>
             </div>
         </div>

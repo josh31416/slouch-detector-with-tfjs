@@ -4,8 +4,8 @@
  *  https://github.com/tobiasahlin/SpinKit
  */
 .sk-spinner-pulse {
-    width: 20px;
-    height: 20px;
+    min-width: 4em;
+    min-height: 4em;
     margin: auto 10px;
     float: left;
     background-color: #333;
@@ -51,5 +51,5 @@
 
 .slouching-alert.active {
     opacity: 1;
-    color: #e6b800;
+    color: darkred;
 }

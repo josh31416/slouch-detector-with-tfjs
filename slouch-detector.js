@@ -1,5 +1,5 @@
 
-/*
+/**
  * Init default PoseNet properties
  */
 var posenetProperties = {
@@ -23,11 +23,31 @@ const config = {
 	color: 'aqua',
 	boundingBoxColor: 'red',
 	lineWidth: 2,
-	mlpThreshold: 0.5
+	mlpThreshold: 0.6,
+	training: {
+		sampleSize: 100,
+		epochs: 50,
+		batchSize: 32
+	}
+}
+const msg = {
+	START_TRAINING: "Remember, now comes the part where you should be slouching. Don't worry, you can move around a little bit. Click the start button when you are ready.",
+	ALERT_ACTIVE_HEADING: "Don't give up now",
+	ALERT_ACTIVE_TEXT: 'You can do it!',
+	ALERT_HEADING: 'You are doing great',
+	ALERT_TEXT: 'Keep it up!',
+	ALERT_MISSING_HEADING: 'Well, this is embarrassing but...',
+	ALERT_MISSING_TEXT: "It looks like I can't see your",
+	TRAINING_STRAIGHT: "Great. Now sit straight and click the start button when you are ready."
 }
 
 
 var realTime = true;
+var training = false;
+var trainingData = {
+	slouching: [],
+	straight: []
+};
 var requiredKeypoints = [
 		'leftShoulder',
 		// 'leftEar',
@@ -39,7 +59,7 @@ var requiredKeypoints = [
 	]
 
 
-/*
+/**
  * Main function that will run our code.
  * 
  * This is the main function of the slouch detector. It executes
@@ -58,10 +78,45 @@ async function run() {
 	canvas.width = config.videoWidth;
 	canvas.height = config.videoHeight;
 
+	$('.training-button').click(function (e) {
+		hide($('.prediction'));
+		show($('.training'));
+		$('.training-info').html(msg.START_TRAINING)
+	});
+	$('.training-start-button').click(function (e) {
+		training = true;
+		hide($('.training-actions'));
+		show($('.progress'));
+	});
+	$('.training-cancel-button').click(function (e) {
+		trainingData.slouching = [];
+		trainingData.straight = [];
+		training = false;
+		show($('.prediction'));
+		hide($('.training'));
+	});
+
 	const model = createModel();
 	// tfvis.show.modelSummary({name: 'Model Summary'}, model);
 
 	poseDetectionFrame(video, net, canvas, model);
+}
+
+function hide(element) {
+	$(element).css('display', 'none');
+}
+
+function show(element) {
+	$(element).css('display', '');
+}
+
+
+function camelToNormal(str) {
+	return str.replace(
+		/(.+?)([A-Z][a-z]*)/g,
+		function(match, p1, p2) {
+			return p1.toLowerCase()+' '+p2.toLowerCase();
+		});
 }
 
 /* BEGIN MLP */
@@ -70,9 +125,47 @@ async function run() {
  * Predict if the user is slouching
  *
  * @param {array}	keypoints 	Array of keypoints predicted by posenet
+ * @param {Object}	model 	 	Slouching classifier
  */
 async function predictSlouching(keypoints, model) {
+	keypoints = checkKeypoints(keypoints);
+	if (!keypoints)
+		return;
 
+	const inputs = flattenKeypoints(keypoints);
+	const tensorData = convertToTensor([inputs]);
+	const inputTensor = tensorData;
+
+	// Train the model
+	// await trainModel(model, inputs, labels);
+	// console.log('Done Training');
+
+	const pred = model.predict(inputTensor);
+	const output = tf.sigmoid(pred).dataSync();
+
+	var $alert = $('.alert');
+	if (output >= config.mlpThreshold) {
+		$('.slouching-alert').addClass('active');
+		$alert.prop('class', 'alert alert-warning');
+		$alert.find('.alert-heading').html(msg.ALERT_ACTIVE_HEADING);
+		$alert.find('.alert-text').html(msg.ALERT_ACTIVE_TEXT);
+	} else {
+		$('.slouching-alert').removeClass('active');
+		$alert.prop('class', 'alert');
+		$alert.find('.alert-heading').html(msg.ALERT_HEADING)
+		$alert.find('.alert-text').html(msg.ALERT_TEXT);
+	}
+
+	console.log(output)
+}
+
+
+/**
+ * Check if the required keypoits are present
+ *
+ * @param {array}	keypoints 	Array of keypoints predicted by posenet
+ */
+function checkKeypoints(keypoints) {
 	keypoints = keypoints
 		.filter(keypoint => (requiredKeypoints.includes(keypoint.part)))
 		.filter(keypoint => (keypoint.score > config.minPartConfidence));
@@ -82,55 +175,40 @@ async function predictSlouching(keypoints, model) {
 		var visibleParts = keypoints.map(keypoint => (keypoint.part));
 		var part = requiredKeypoints.filter(requiredKeypoint => (visibleParts.indexOf(requiredKeypoint) === -1))[0];
 		$alert.prop('class', 'alert alert-secondary');
-		$alert.find('.alert-heading').html('Well, this is embarrassing but...')
-		$alert.find('.alert-text').html(`It looks like I can't see your ${part}`);
-		return;
+		$alert.find('.alert-heading').html(msg.ALERT_MISSING_HEADING)
+		$alert.find('.alert-text').html(`${msg.ALERT_MISSING_TEXT} ${camelToNormal(part)}`);
+
+		return null;
 	}
 
-	const tensorData = convertToTensor(keypoints);
-	const { inputTensor } = tensorData;
-
-	// Train the model
-	// await trainModel(model, inputs, labels);
-	// console.log('Done Training');
-
-	const pred = model.predict(inputTensor);
-	const output = tf.sigmoid(pred).dataSync();
-	if (output >= config.mlpThreshold) {
-		$('.slouching-alert').addClass('active');
-		$alert.prop('class', 'alert alert-warning');
-		$alert.find('.alert-heading').html("Don't give up now")
-		$alert.find('.alert-text').html('You can do it!');
-	} else {
-		$('.slouching-alert').removeClass('active');
-		$alert.prop('class', 'alert');
-		$alert.find('.alert-heading').html('You are doing great')
-		$alert.find('.alert-text').html('Keep it up!');
-	}
-
-	console.log(output)
+	return keypoints;
 }
 
 
 /**
- * Extract position from all the keypoints
+ * Extract position from all the keypoints and flat the array
+ *
+ * @param {array}	keypoints 	Array of keypoints predicted by posenet
  */
-function convertToTensor(keypoints) {
+function flattenKeypoints(keypoints) {
 	keypoints = keypoints
 		.map(keypoint => ([
 			keypoint.position.x,
 			keypoint.position.y
 		]))
 		.flat();
-	const inputs = [keypoints];
+	return keypoints;
+}
 
-	const inputTensor = tf.tensor(inputs);
 
-	// const normalizedInputs = inputTensor
-	// 	.sub()
-	// 	.div([config.videoWidth, config.videoHeight].sub([0, 0]));
-
-	return { inputTensor }
+/**
+ * Convert to a tensor from tensorflow
+ *
+ * @param {array}	inputs 	Array of flattened keypoints
+ */
+function convertToTensor(data) {
+	return tf.tensor(data)
+		.div(config.videoWidth);
 }
 
 
@@ -142,35 +220,102 @@ function createModel() {
 
 	inputDim = requiredKeypoints.length * 2;
 
-	model.add(tf.layers.dense({inputDim: inputDim, units: 24, useBias: true}));
+	model.add(tf.layers.dense({inputDim: inputDim, units: 32, useBias: true}));
+	model.add(tf.layers.dense({units: 16, useBias: true}));
 	model.add(tf.layers.dense({units: 1, useBias: true}));
 
 	return model;
 }
 
 
-// async function trainModel(model, inputs, labels) {
-//   // Prepare the model for training.  
-//   model.compile({
-//     optimizer: tf.train.adam(),
-//     loss: tf.losses.meanSquaredError,
-//     metrics: ['mse'],
-//   });
-  
-//   const batchSize = 32;
-//   const epochs = 50;
-  
-//   return await model.fit(inputs, labels, {
-//     batchSize,
-//     epochs,
-//     shuffle: true,
-//     callbacks: tfvis.show.fitCallbacks(
-//       { name: 'Training Performance' },
-//       ['loss', 'mse'], 
-//       { height: 200, callbacks: ['onEpochEnd'] }
-//     )
-//   });
-// }
+/**
+ * Gather training data and train the model
+ *
+ * @param {array}	keypoints 	Array of keypoints predicted by posenet
+ * @param {Object}	model 	 	Slouching classifier
+ */
+async function train(keypoints, model) {
+	keypoints = checkKeypoints(keypoints);
+	if (!keypoints)
+		return;
+
+	const inputs = flattenKeypoints(keypoints);
+
+	if (trainingData.slouching.length != config.training.sampleSize) {
+		if (trainingData.slouching.length == 0) {
+			$('.slouching-part').css('font-weight', 'bold');
+			$('.straight-part').css('opacity', 0.6);
+			$('.training-info').html('');
+		}
+		trainingData.slouching.push(inputs);
+		const percentage = 100 * trainingData.slouching.length / config.training.sampleSize;
+		$('.progress-bar').css('width', percentage+'%');
+		$('.progress-bar').html(percentage+'%');
+		if (trainingData.slouching.length == config.training.sampleSize) {
+			$('.slouching-part').css('opacity', 0.6);
+			$('.slouching-part').css('font-weight', '');
+			$('.straight-part').css('opacity', 1);
+			$('.straight-part').css('font-weight', 'bold');
+
+			$('.progress-bar').css('width', '0');
+			$('.training-info').html(msg.TRAINING_STRAIGHT);
+
+			training = false;
+			show($('.training-actions'));
+			hide($('.progress'));
+		}
+	}
+	else if (trainingData.straight.length != config.training.sampleSize && training) {
+		$('.training-info').html('');
+		trainingData.straight.push(inputs);
+		const percentage = 100 * trainingData.straight.length / config.training.sampleSize;
+		$('.progress-bar').css('width', percentage+'%');
+		$('.progress-bar').html(percentage+'%');
+	}
+	else if (trainingData.straight.length == config.training.sampleSize){
+		const slouchingInputs = tf.tensor(trainingData.slouching).div(config.videoWidth);
+		const straightInputs = tf.tensor(trainingData.straight).div(config.videoWidth);
+		const inputs = slouchingInputs.concat(straightInputs);
+
+		const slouchingLabels = tf.ones([config.training.sampleSize]);
+		const straightLabels = tf.zeros([config.training.sampleSize]);
+		const labels = slouchingLabels.concat(straightLabels);
+
+		await trainModel(model, inputs, labels);
+		trainingData.slouching = [];
+		trainingData.straight = [];
+		training = false;
+		show($('.training-actions'));
+		hide($('.progress'));
+
+		show($('.prediction'));
+		hide($('.training'));
+	}
+}
+
+
+async function trainModel(model, inputs, labels) {
+	// Prepare the model for training.
+	model.compile({
+		optimizer: tf.train.adam(),
+		loss: tf.losses.meanSquaredError,
+		metrics: ['mse'],
+	});
+
+	const batchSize = config.training.batchSize;
+	const epochs = config.training.epochs;
+
+	return await model.fit(inputs, labels, {
+		batchSize,
+		epochs,
+		shuffle: true,
+		callbacks: tfvis.show.fitCallbacks(
+			{ name: 'Training Performance' },
+			['loss'],
+			{ height: 200, callbacks: ['onEpochEnd'] }
+		)
+	});
+}
 
 
 /* END MLP */
@@ -186,11 +331,11 @@ function createModel() {
 function toggleLoadingUI(showLoadingUI,
 						 loadingDivId = 'loading', mainDivId = 'main') {
 	if (showLoadingUI) {
-		document.getElementById(loadingDivId).style.display = 'block';
-		document.getElementById(mainDivId).style.display = 'none';
+		document.getElementById(loadingDivId).style.display = '';
+		document.getElementById(mainDivId).style.setProperty('display', 'none', 'important');
 	} else {
-		document.getElementById(loadingDivId).style.display = 'none';
-		document.getElementById(mainDivId).style.display = 'block';
+		document.getElementById(loadingDivId).style.setProperty('display', 'none', 'important');
+		document.getElementById(mainDivId).style.display = '';
 	}
 }
 
@@ -381,7 +526,7 @@ function drawBoundingBox(keypoints, ctx) {
  * @param {Object}	canvas			Canvas to draw the result of the detection
  */
 async function poseDetectionFrame(video, net, canvas, model) {
-	/*
+	/**
 	 * Change to architecture
 	 */
 	// Important to purge variables and free up GPU memory when changing architecture
@@ -392,7 +537,7 @@ async function poseDetectionFrame(video, net, canvas, model) {
 	//guiState.architecture = guiState.changeToArchitecture;
 	//guiState.changeToArchitecture = null;
 
-	/*
+	/**
 	 * Change to multiplier
 	 */
 	// Important to purge variables and free up GPU memory when changing architecture
@@ -403,7 +548,7 @@ async function poseDetectionFrame(video, net, canvas, model) {
 	//guiState.multiplier = +guiState.changeToMultiplier;
 	//guiState.changeToMultiplier = null;
 
-	/*
+	/**
 	 * Change to outputStride
 	 */
 	// Important to purge variables and free up GPU memory when changing architecture
@@ -414,7 +559,7 @@ async function poseDetectionFrame(video, net, canvas, model) {
 	//guiState.outputStride = +guiState.changeToOutputStride;
 	//guiState.changeToOutputStride = null;
 
-	/*
+	/**
 	 * Change to inputResolution
 	 */
 	// Important to purge variables and free up GPU memory when changing architecture
@@ -425,7 +570,7 @@ async function poseDetectionFrame(video, net, canvas, model) {
 	//guiState.inputResolution = +guiState.changeToInputResolution;
 	//guiState.changeToInputResolution = null;
 
-	/*
+	/**
 	 * Change to quantBytes
 	 */
 	// Important to purge variables and free up GPU memory when changing architecture
@@ -471,8 +616,10 @@ async function poseDetectionFrame(video, net, canvas, model) {
 				// drawBoundingBox(keypoints, ctx);
 		}
 	});
-
-	await predictSlouching(poses[0].keypoints, model)
+	if (!training)
+		await predictSlouching(poses[0].keypoints, model)
+	else
+		await train(poses[0].keypoints, model)
 
 	if (realTime)
 		requestAnimationFrame(poseDetectionFrame.bind(null, video, net, canvas, model))
