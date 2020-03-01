@@ -6,7 +6,7 @@ This project uses [PoseNet](https://github.com/tensorflow/tfjs-models/tree/maste
 
 ### Installation
 
-- Download this project as a zip [here](https://github.com/josh31416/slouch_detector_with_tfjs/archive/develop.zip)
+- Download this project as a zip [slouch_detector_with_tfjs.zip](https://github.com/josh31416/slouch_detector_with_tfjs/archive/develop.zip) or clone the repository
 - Unzip the project and open `slouch-detector.html`
 - Allow camera access and train the model following the instructions
 
