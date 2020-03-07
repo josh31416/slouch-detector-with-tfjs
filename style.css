@@ -53,3 +53,8 @@
     opacity: 1;
     color: darkred;
 }
+
+.play-sound-button {
+    font-size: 2em;
+    cursor: pointer;
+}

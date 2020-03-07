@@ -41,6 +41,8 @@ const msg = {
 	TRAINING_STRAIGHT: "Great. Now sit straight and click the start button when you are ready."
 }
 
+var playSound = false;
+var playingSound = false;
 
 var realTime = true;
 var training = false;
@@ -49,14 +51,14 @@ var trainingData = {
 	straight: []
 };
 var requiredKeypoints = [
-		'leftShoulder',
-		// 'leftEar',
-		'leftEye',
-		'nose',
-		'rightEye',
-		// 'rightEar',
-		'rightShoulder'
-	]
+	'leftShoulder',
+	// 'leftEar',
+	'leftEye',
+	'nose',
+	'rightEye',
+	// 'rightEar',
+	'rightShoulder'
+]
 
 
 /**
@@ -95,8 +97,24 @@ async function run() {
 		show($('.prediction'));
 		hide($('.training'));
 	});
+	$('.play-sound-button').click(function (e) {
+		if (playSound) {
+			$(this).find('svg').removeClass('fa-volume-up');
+			$(this).find('svg').addClass('fa-volume-mute');
+			playSound = false;
+		} else {
+			$(this).find('svg').removeClass('fa-volume-mute');
+			$(this).find('svg').addClass('fa-volume-up');
+			playSound = true;
+		}
+	});
 
-	const model = createModel();
+	var model;
+	try {
+		model = await tf.loadLayersModel('localstorage://model');
+	} catch (err) {
+		model = createModel();
+	}
 	// tfvis.show.modelSummary({name: 'Model Summary'}, model);
 
 	poseDetectionFrame(video, net, canvas, model);
@@ -136,10 +154,6 @@ async function predictSlouching(keypoints, model) {
 	const tensorData = convertToTensor([inputs]);
 	const inputTensor = tensorData;
 
-	// Train the model
-	// await trainModel(model, inputs, labels);
-	// console.log('Done Training');
-
 	const pred = model.predict(inputTensor);
 	const output = tf.sigmoid(pred).dataSync();
 
@@ -149,14 +163,18 @@ async function predictSlouching(keypoints, model) {
 		$alert.prop('class', 'alert alert-warning');
 		$alert.find('.alert-heading').html(msg.ALERT_ACTIVE_HEADING);
 		$alert.find('.alert-text').html(msg.ALERT_ACTIVE_TEXT);
+		if (playSound && !playingSound) {
+			playingSound = true;
+			var audio = new Audio('psybeat.wav');
+			audio.play();
+			audio.onended = function() { playingSound = false;}
+		}
 	} else {
 		$('.slouching-alert').removeClass('active');
 		$alert.prop('class', 'alert');
 		$alert.find('.alert-heading').html(msg.ALERT_HEADING)
 		$alert.find('.alert-text').html(msg.ALERT_TEXT);
 	}
-
-	console.log(output)
 }
 
 
@@ -290,6 +308,8 @@ async function train(keypoints, model) {
 
 		show($('.prediction'));
 		hide($('.training'));
+
+		await model.save('localstorage://model');
 	}
 }
 
