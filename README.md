@@ -2,7 +2,11 @@
 
 ### Quickstart
 
-This project uses [PoseNet](https://github.com/tensorflow/tfjs-models/tree/master/posenet) model from [Tensorflow JS Models](https://github.com/tensorflow/tfjs-models) for assessing how much you are slouching.
+This project uses [PoseNet](https://github.com/tensorflow/tfjs-models/tree/master/posenet) model from [Tensorflow JS Models](https://github.com/tensorflow/tfjs-models) for assessing how much you are slouching when sitting.
+
+![Slouching GIF](https://media0.giphy.com/media/eewrsrnLvU9hK/giphy.gif)
+
+Source: Giphy
 
 ### Installation
 
